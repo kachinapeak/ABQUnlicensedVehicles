@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">ABQ Unlicensed Vehicles</string>
+    <string name="location_permission_denied">LocationDisplayManager cannot run because location permission was denied</string>
     <string name="action_settings">Settings</string>
     <string name="sample_service_url">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/NeighborhoodAssociation1/FeatureServer/0</string>
     <string name="sample_service_url1">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/UnlicensedVehicles/FeatureServer/0</string>

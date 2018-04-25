@@ -1,16 +1,20 @@
 <resources>
     <string name="app_name">ABQ Unlicensed Vehicles</string>
     <string name="location_permission_denied">LocationDisplayManager cannot run because location permission was denied</string>
+    <string name="action_search">Search</string>
+    <string name="search_hint">Search for Vehicle Type</string>
     <string name="action_settings">Settings</string>
-    <string name="sample_service_url">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/NeighborhoodAssociation1/FeatureServer/0</string>
-    <string name="sample_service_url1">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/UnlicensedVehicles/FeatureServer/0</string>
+    <string name="sample_service_neighborhoodassociation">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/NeighborhoodAssociation1/FeatureServer/0</string>
+    <string name="sample_service_unlicensedvehicle">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/UnlicensedVehicles/FeatureServer/0</string>
+    <string name="sample_service_areacommands">https://services1.arcgis.com/ZIL9uO234SBBPGL7/ArcGIS/rest/services/AreaCommands/FeatureServer/0</string>
     <string name="title_activity_operational_layers">OperationalLayers</string>
     <string name="operational_layers">Layer Management</string>
     <string name="done">Done</string>
-    <string name="added_layers"> Added layers</string>
-    <string name="removed_layers"> Removed layers</string>
+    <string name="added_layers">Added layers</string>
+    <string name="removed_layers">Removed layers</string>
     <string-array name="operational_layer_array">
-        <item>NeighborhoodAssociations</item>
-        <item>UnlicensedVehicles</item>
+        <item>Neighborhood Associations</item>
+        <item>Unlicensed Vehicles</item>
+        <item>Area Commands</item>
     </string-array>
 </resources>

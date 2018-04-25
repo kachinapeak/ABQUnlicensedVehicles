@@ -84,14 +84,18 @@ public class OperationalLayers extends AppCompatActivity {
                 if (mAddedLayerList.size() > 1) {
                     // if the first item on the list it world elevations make sure that the
                     // same layer is present in the LayerList of the Map
-                    if (mAddedLayerList.get(0).equals("NeighborhoodAssociations")) {
-                        if (!mMapOperationalLayers.get(0).getName().equals("NeighborhoodAssociations")) {
+                    if (mAddedLayerList.get(0).equals("Neighborhood Associations")) {
+                        if (!mMapOperationalLayers.get(0).getName().equals("Neighborhood Associations")) {
+                            // if not then swap the layer positons
+                            Layer temp = mMapOperationalLayers.remove(0);
+                            mMapOperationalLayers.add(1, temp);
+                        } else if (!mMapOperationalLayers.get(0).getName().equals("Unlicensed Vehicles")) {
                             // if not then swap the layer positons
                             Layer temp = mMapOperationalLayers.remove(0);
                             mMapOperationalLayers.add(1, temp);
                         }
                     } else {
-                        if (!mMapOperationalLayers.get(0).getName().equals("UnlicensedVehicles")) {
+                        if (!mMapOperationalLayers.get(0).getName().equals("Area Commands")) {
                             Layer temp = mMapOperationalLayers.remove(0);
                             mMapOperationalLayers.add(1, temp);
                         }

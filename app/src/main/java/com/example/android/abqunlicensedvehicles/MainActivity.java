@@ -1,11 +1,44 @@
 package com.example.android.abqunlicensedvehicles;
 
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.SearchView;
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 
+import java.text.SimpleDateFormat;
+import java.util.GregorianCalendar;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import com.esri.arcgisruntime.data.ArcGISFeature;
+import com.esri.arcgisruntime.data.FeatureEditResult;
+import com.esri.arcgisruntime.geometry.GeometryEngine;
+import com.esri.arcgisruntime.layers.Layer;
+import com.esri.arcgisruntime.mapping.GeoElement;
+import com.esri.arcgisruntime.mapping.view.Callout;
+import com.esri.arcgisruntime.mapping.view.DefaultMapViewOnTouchListener;
+import com.esri.arcgisruntime.mapping.view.IdentifyLayerResult;
+import android.app.SearchManager;
+import android.content.Context;
+import android.graphics.Color;
+import android.util.Log;
+import android.view.Menu;
+import com.esri.arcgisruntime.concurrent.ListenableFuture;
+import com.esri.arcgisruntime.data.Feature;
+import com.esri.arcgisruntime.data.FeatureQueryResult;
+import com.esri.arcgisruntime.data.QueryParameters;
+import com.esri.arcgisruntime.geometry.Envelope;
+import com.esri.arcgisruntime.symbology.SimpleFillSymbol;
+import com.esri.arcgisruntime.symbology.SimpleLineSymbol;
+import com.esri.arcgisruntime.symbology.SimpleRenderer;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
@@ -27,6 +60,7 @@ import com.example.android.abqunlicensedvehicles.spinner.ItemData;
 import com.example.android.abqunlicensedvehicles.spinner.SpinnerAdapter;
 import android.widget.AdapterView;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -36,12 +70,23 @@ public class MainActivity extends AppCompatActivity {
     private static LayerList mOperationalLayers;
     private MapView mMapView;
     private LocationDisplay mLocationDisplay;
+    private PointSelect mPointSelect;
     private Spinner mSpinner;
+    private FeatureLayer mFeatureLayer1;
+    private FeatureLayer mFeatureLayer2;
+    private FeatureLayer mFeatureLayer3;
+    private ServiceFeatureTable mServiceFeatureTable1;
+    private ServiceFeatureTable mServiceFeatureTable2;
+    private ServiceFeatureTable mServiceFeatureTable3;
+    private Callout mCallout;
+    private boolean mFeatureSelected = false;
+    private ArcGISFeature mIdentifiedFeature;
 
 
     private int requestCode = 2;
     String[] reqPermissions = new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission
             .ACCESS_COARSE_LOCATION};
+
 
     public static LayerList getOperationalLayerList() {
         return mOperationalLayers;
@@ -52,7 +97,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
         Button selectLayers;
 
         mMapView = findViewById(R.id.mapView);
@@ -60,21 +104,100 @@ public class MainActivity extends AppCompatActivity {
 
         selectLayers = (Button) findViewById(R.id.operationallayer);
 
+
         mLocationDisplay = mMapView.getLocationDisplay();
-        ArcGISMap mMap = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, 35.13700577, -106.59444565, 12);
+        final ArcGISMap mMap = new ArcGISMap(Basemap.Type.TOPOGRAPHIC, 35.13700577, -106.59444565, 12);
 
+        mCallout = mMapView.getCallout();
 
-        ServiceFeatureTable serviceFeatureTable = new ServiceFeatureTable(getResources().getString(R.string.sample_service_url));
-        ServiceFeatureTable serviceFeatureTable1 = new ServiceFeatureTable(getResources().getString(R.string.sample_service_url1));
+        mServiceFeatureTable1  = new ServiceFeatureTable(getResources().getString(R.string.sample_service_neighborhoodassociation));
+        mServiceFeatureTable2  = new ServiceFeatureTable(getResources().getString(R.string.sample_service_unlicensedvehicle));
+        mServiceFeatureTable3  = new ServiceFeatureTable(getResources().getString(R.string.sample_service_areacommands));
 
-        FeatureLayer featureLayer = new FeatureLayer(serviceFeatureTable);
-        FeatureLayer featureLayer1 = new FeatureLayer(serviceFeatureTable1);
+        mFeatureLayer1 = new FeatureLayer(mServiceFeatureTable1);
+        mFeatureLayer2 = new FeatureLayer(mServiceFeatureTable2);
+        mFeatureLayer3 = new FeatureLayer(mServiceFeatureTable3);
 
         mOperationalLayers = mMap.getOperationalLayers();
 
-        mMap.getOperationalLayers().add(featureLayer);
-        mMap.getOperationalLayers().add(featureLayer1);
+        mMap.getOperationalLayers().add(mFeatureLayer1);
+        mMap.getOperationalLayers().add(mFeatureLayer2);
+        mMap.getOperationalLayers().add(mFeatureLayer3);
+        Toast.makeText(getApplicationContext(), "Tap on a feature to select it", Toast.LENGTH_LONG).show();
 
+        mMapView.setOnTouchListener(new DefaultMapViewOnTouchListener(this, mMapView) {
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent e) {
+                // remove any existing callouts
+                if (mCallout.isShowing()) {
+                    mCallout.dismiss();
+                }
+                // get the point that was clicked and convert it to a point in map coordinates
+                final Point clickPoint = mMapView
+                        .screenToLocation(new android.graphics.Point(Math.round(e.getX()), Math.round(e.getY())));
+                // create a selection tolerance
+                int tolerance = 10;
+                double mapTolerance = tolerance * mMapView.getUnitsPerDensityIndependentPixel();
+                // use tolerance to create an envelope to query
+                Envelope envelope = new Envelope(clickPoint.getX() - mapTolerance, clickPoint.getY() - mapTolerance,
+                        clickPoint.getX() + mapTolerance, clickPoint.getY() + mapTolerance, mMap.getSpatialReference());
+                QueryParameters query = new QueryParameters();
+                query.setGeometry(envelope);
+                // request all available attribute fields
+                final ListenableFuture<FeatureQueryResult> future = mServiceFeatureTable2
+                        .queryFeaturesAsync(query, ServiceFeatureTable.QueryFeatureFields.LOAD_ALL);
+                // add done loading listener to fire when the selection returns
+                future.addDoneListener(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            //call get on the future to get the result
+                            FeatureQueryResult result = future.get();
+                            // create an Iterator
+                            Iterator<Feature> iterator = result.iterator();
+                            // create a TextView to display field values
+                            TextView calloutContent = new TextView(getApplicationContext());
+                            calloutContent.setTextColor(Color.BLACK);
+                            calloutContent.setSingleLine(false);
+                            calloutContent.setVerticalScrollBarEnabled(true);
+                            calloutContent.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+                            calloutContent.setMovementMethod(new ScrollingMovementMethod());
+                            calloutContent.setLines(15);
+                            // cycle through selections
+                            int counter = 0;
+                            Feature feature;
+                            while (iterator.hasNext()) {
+                                feature = iterator.next();
+                                // create a Map of all available attributes as name value pairs
+                                Map<String, Object> attr = feature.getAttributes();
+                                Set<String> keys = attr.keySet();
+                                for (String key : keys) {
+                                    Object value = attr.get(key);
+                                    // format observed field value as date
+                                    if (value instanceof GregorianCalendar) {
+                                        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd-MMM-yyyy", Locale.US);
+                                        value = simpleDateFormat.format(((GregorianCalendar) value).getTime());
+                                    }
+                                    // append name value pairs to TextView
+                                    calloutContent.append(key + " | " + value + "\n");
+                                }
+                                counter++;
+                                // center the mapview on selected feature
+                                Envelope envelope = feature.getGeometry().getExtent();
+                                mMapView.setViewpointGeometryAsync(envelope, 200);
+                                // show CallOut
+                                mCallout.setLocation(clickPoint);
+                                mCallout.setContent(calloutContent);
+                                mCallout.show();
+                            }
+                        } catch (Exception e) {
+                            Log.e(getResources().getString(R.string.app_name), "Select feature failed: " + e.getMessage());
+                        }
+                    }
+                });
+                return super.onSingleTapConfirmed(e);
+            }
+        });
 
         mMapView.setMap(mMap);
 
@@ -197,6 +320,76 @@ public class MainActivity extends AppCompatActivity {
             // Update UI to reflect that the location display did not actually start
             mSpinner.setSelection(0, true);
         }
+    }
+
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        setIntent(intent);
+        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+            String searchString = intent.getStringExtra(SearchManager.QUERY);
+
+            searchForState(searchString);
+        }
+    }
+
+    public void searchForState(final String searchString) {
+
+        // clear any previous selections
+        mFeatureLayer2.clearSelection();
+
+        // create objects required to do a selection with a query
+        QueryParameters query = new QueryParameters();
+        //make search case insensitive
+        query.setWhereClause("upper(TYPE) LIKE '%" + searchString.toUpperCase() + "%'");
+
+        // call select features
+        final ListenableFuture<FeatureQueryResult> future = mServiceFeatureTable2.queryFeaturesAsync(query);
+        // add done loading listener to fire when the selection returns
+        future.addDoneListener(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // call get on the future to get the result
+                    FeatureQueryResult result = future.get();
+
+                    // check there are some results
+                    if (result.iterator().hasNext()) {
+
+                        // get the extend of the first feature in the result to zoom to
+                        Feature feature = result.iterator().next();
+                        Envelope envelope = feature.getGeometry().getExtent();
+                        mMapView.setViewpointGeometryAsync(envelope, 10);
+
+                        //Select the feature
+                        mFeatureLayer2.selectFeature(feature);
+
+                    } else {
+                        Toast.makeText(MainActivity.this, "No vehicles found with name: " + searchString, Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "Feature search failed for: " + searchString + ". Error=" + e.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+                    Log.e(getResources().getString(R.string.app_name),
+                            "Feature search failed for: " + searchString + ". Error=" + e.getMessage());
+                }
+            }
+        });
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+
+        // Get the SearchView and set the searchable configuration
+        SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
+        SearchView searchView = (SearchView) menu.findItem(R.id.action_search).getActionView();
+        // Assumes current activity is the searchable activity
+        searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
+        searchView.setIconifiedByDefault(false); // Do not iconify the widget; expand it by default
+
+        return true;
     }
 
     @Override
